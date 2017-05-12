@@ -118,4 +118,4 @@ Bluepill was inspired by [parallel iOS test](https://github.com/plu/parallel_ios
 
 - How to BUMP the max files and max procs to support running multiple simulators on macOS?
 
-  Check - https://blog.dekstroza.io/ulimit-shenanigans-on-osx-el-capitan/
+  Check - https://blog.dekstroza.io/ulimit-shenanigans-on-osx-el-capitan/ .
