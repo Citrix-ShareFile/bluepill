@@ -29,19 +29,18 @@
                                          }];
 
     /**from here we need to go inside this node and get its child nodes
-     *
-     * testsuites from a simulator report (.xml) - needs to be combined
-     *    |--testsuite with scheme name (.xctest) - needs to be combined
-     *           |--testsuite with test class name (XXXXTests) - needs to be combined
-     *           |      |--testcase
-     *           |      |--testcase
-     *           |      |--testcase
-     *           |           ...
-     *           |--testsuite
-     *                ...
-     */
+    *
+    * testsuites from a simulator report (.xml) - needs to be combined
+    *     |--testsuite with test class name (XXXXTests) - needs to be combined
+    *     |      |--testcase
+    *     |      |--testcase
+    *     |      |--testcase
+    *     |           ...
+    *     |--testsuite
+    *             ...
+    */
     
-    NSXMLElement *rootElement;
+    NSMutableDictionary *all_tests = [NSMutableDictionary new];
     
     for (NSURL *url in enumerator) {
         NSError *error;
@@ -60,7 +59,18 @@
                     return;
                 }
                 
-                rootElement = rootElement == nil? doc.rootElement : [self mergeElement:rootElement withElement:doc.rootElement];
+                NSArray *testCaseNodes = [doc.rootElement nodesForXPath:@"//testcase" error:&error];
+                for (NSXMLElement *testCaseNode in testCaseNodes) {
+                    NSString *className = [[testCaseNode attributeForName:@"classname"] stringValue];
+                    NSString *testName = [[testCaseNode attributeForName:@"name"] stringValue];
+                    if ([all_tests objectForKey:className] == nil) {
+                        all_tests[className] = [NSMutableDictionary new];
+                    }
+                    //don't re-write passed test with failed
+                    if (([all_tests[className] objectForKey:testName] == nil) || [self testPassed:testCaseNode]) {
+                        all_tests[className][testName] = testCaseNode;
+                    }
+                }
 
                 if (fileHandler) {
                     fileHandler(url);
@@ -69,84 +79,66 @@
         }
     }
     
-    NSXMLDocument *xmlRequest = [NSXMLDocument documentWithRootElement:rootElement];
-    NSData *xmlData = [xmlRequest XMLDataWithOptions:NSXMLDocumentIncludeContentTypeDeclaration];
+    NSXMLElement *rootNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuites"];
+    for (NSString *className in all_tests) {
+        NSMutableDictionary *tests = [all_tests objectForKey:className]; //all_tests[className];
+        NSXMLElement *testSuiteNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuite"];
+        
+        for (NSString *testName in tests) {
+            [testSuiteNode addChild:[tests objectForKey:testName]];
+        }
+        
+        // might improve by adding device name to suite name, or introducing one more level of testsuites
+        testSuiteNode = [self setNodeAttributes:testSuiteNode withName:className];
+        [rootNode addChild:testSuiteNode];
+    }
+
+    rootNode = [self setNodeAttributes:rootNode withName:@"Selected tests"];
+    
+    NSXMLDocument *resultXMLDoc = [NSXMLDocument documentWithRootElement:rootNode];
+    NSData *xmlData = [resultXMLDoc XMLDataWithOptions:NSXMLDocumentIncludeContentTypeDeclaration];
     [xmlData writeToFile:finalReportPath atomically:YES];
 }
 
-// This function combines two XML elements that has the same "name" attribute by merging attributes and children recursively
-+ (NSXMLElement *)mergeElement:(NSXMLElement *)mainElement withElement:(NSXMLElement *)secondElement {
++ (NSXMLElement *)setNodeAttributes:(NSXMLElement *)node withName:(NSString *)testSuiteName {
+    NSError *error;
+    NSMutableDictionary *nodeAttributes = [NSMutableDictionary new];
+    nodeAttributes[@"name"] = testSuiteName;
+    NSArray *tests = [node nodesForXPath:@".//testcase" error:&error];
+    nodeAttributes[@"tests"] = [@(tests.count) stringValue];
+    NSArray *errors = [node nodesForXPath:@".//error" error:&error];
+    nodeAttributes[@"errors"] = [@(errors.count) stringValue];
+    NSArray *failures = [node nodesForXPath:@".//failure" error:&error];
+    nodeAttributes[@"failures"] = [@(failures.count) stringValue];
+    nodeAttributes[@"time"] = [@([self getTimeFromAllTestNodes:node]) stringValue];
+    [node setAttributesAsDictionary:nodeAttributes];
     
-    @autoreleasepool {
-        
-        //if they have the same name, we need to combine these two elements
-        if ([self compareNamesForElement:mainElement and:secondElement]) {
-            
-            //combine attributes
-            int totalTests = [[[mainElement attributeForName:@"tests"] stringValue] intValue] + [[[secondElement attributeForName:@"tests"] stringValue] intValue];
-            int totalErrors = [[[mainElement attributeForName:@"errors"] stringValue] intValue] + [[[secondElement attributeForName:@"errors"] stringValue] intValue];
-            int totalFailures = [[[mainElement attributeForName:@"failures"] stringValue] intValue] + [[[secondElement attributeForName:@"failures"] stringValue] intValue];
-            int totalTime = [[[mainElement attributeForName:@"time"] stringValue] intValue] + [[[secondElement attributeForName:@"time"] stringValue] intValue];
-            
-            NSMutableDictionary *m_attributes = [NSMutableDictionary new];
-            m_attributes[@"tests"] = [@(totalTests) stringValue];
-            m_attributes[@"errors"] = [@(totalErrors) stringValue];
-            m_attributes[@"failures"] = [@(totalFailures) stringValue];
-            m_attributes[@"time"] = [@(totalTime) stringValue];
-            
-            //combine children
-            //We won't have duplicate test cases so will not do any recurse
-            if ([[mainElement.children firstObject].name isEqualToString:@"testcase"]
-                && [[secondElement.children firstObject].name isEqualToString:@"testcase"]) {
-                for (NSXMLNode *child in secondElement.children) {
-                    [mainElement addChild:[child copy]];
-                }
-                
-            } else {
-                NSMutableArray<NSXMLNode *> *mergedChildren = [NSMutableArray<NSXMLNode *> new];
-                NSMutableArray *discardedItems = [NSMutableArray array];
-                NSMutableArray<NSXMLNode *> *m_children = [NSMutableArray arrayWithArray:mainElement.children];
-                NSMutableArray<NSXMLNode *> *s_children = [NSMutableArray arrayWithArray:secondElement.children];
-                
-                for (NSXMLNode *m_node in m_children) {
-                    if (m_node.kind != NSXMLElementKind) continue;
-                    NSXMLElement *m_element = (NSXMLElement *)m_node;
-                    
-                    for (NSXMLNode *s_node in s_children) {
-                        if (s_node.kind != NSXMLElementKind) continue;
-                        NSXMLElement *s_element = (NSXMLElement *)s_node;
-                        if ([self compareNamesForElement:m_element and:s_element]) {
-                            m_element = [self mergeElement:m_element withElement:s_element];
-                            [discardedItems addObject:s_node];
-                        }
-                    }
-                    
-                    [s_children removeObjectsInArray:discardedItems];
-                    [mergedChildren addObject:m_element];
-                }
-                
-                [mergedChildren addObjectsFromArray:s_children];
-                
-                [mainElement setChildren:nil];
-                for (NSXMLNode *child in mergedChildren) {
-                    [mainElement addChild:[child copy]];
-                }
-            }
-            
-            [mainElement setAttributesAsDictionary:m_attributes];
-            return mainElement;
-            
-        } else {
-            return nil;
-        }
-    }
+    return node;
 }
 
-+ (BOOL)compareNamesForElement:(NSXMLElement *)fistElement and:(NSXMLElement *)secondElement {
-    NSString *firstName = [[fistElement attributeForName:@"name"] stringValue];
-    NSString *secondName = [[secondElement attributeForName:@"name"] stringValue];
-    if (firstName == nil || secondName == nil) return false;
-    return [firstName isEqualToString:secondName];
++ (float)getTimeFromAllTestNodes:(NSXMLElement *)node {
+    NSError *error;
+    float result = 0.0;
+    NSArray *testcaseNodes = [node nodesForXPath:@".//testcase" error:&error];
+    for (NSXMLElement *testCaseNode in testcaseNodes) {
+        NSString *time = [[testCaseNode attributeForName:@"time"] stringValue];
+        result = result + [time floatValue];
+    }
+    
+    return result;
 }
+
++ (Boolean)testPassed:(NSXMLElement *)testCaseNode {
+    NSError *error;
+    NSArray *failures = [testCaseNode nodesForXPath:@"./failure" error:&error];
+    NSArray *errors = [testCaseNode nodesForXPath:@"./error" error:&error];
+
+    Boolean hasNoFailures = !failures.count;
+    Boolean hasNoErrors = !errors.count;
+    
+    return hasNoFailures && hasNoErrors;
+}
+
+
 
 @end

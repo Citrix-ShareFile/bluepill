@@ -488,8 +488,10 @@ void onInterrupt(int ignore) {
         if (context.config.junitOutput) {
             BPWriter *junitLog;
             if (context.config.outputDirectory) {
-                // Only single xml entry.
-                NSString *fileName = [NSString stringWithFormat:@"TEST-%@-results.xml",
+                // need multiple junit reports to get proper output when onlyRetryFailed flag is ON
+                // then merge it all properly
+                NSString *fileName = [NSString stringWithFormat:@"%lu-TEST-%@-results.xml",
+                                      context.attemptNumber,
                                       [[context.config.testBundlePath lastPathComponent] stringByDeletingPathExtension]];
                 NSString *outputFile = [context.config.outputDirectory stringByAppendingPathComponent:fileName];
                 junitLog = [[BPWriter alloc] initWithDestination:BPWriterDestinationFile andPath:outputFile];
