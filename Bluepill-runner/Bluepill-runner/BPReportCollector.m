@@ -156,7 +156,7 @@
 + (NSString *)deviceNameFromPath:(NSURL *)url {
     NSArray<NSString *> *pathComponents = url.pathComponents;
     NSLog (@"Number of elements in url = %lu", [pathComponents count]);
-    unsigned long index = [pathComponents count] - 2; // need last folder name but not last element
+    unsigned long index = [pathComponents count] - 3; // need last folder name but not last element
     NSString *result = [pathComponents objectAtIndex: index];
     return result;
 }
