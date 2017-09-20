@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="Selected tests" tests="10" failures="2" errors="1" time="93.857000">
+<testsuites name="Selected tests" tests="3" failures="1" errors="1" time="20">
+    <testsuite tests="3" failure="1" error="1" time="20" name="ProductName.xctest">
+        <testsuite tests="3" failure="1" error="1" time="20" name="Feature3">
+            <testcase classname="Feature3" name="Feature3-Test1" time="10">
+                <system-out>Full log from test execution goes here</system-out>
+            </testcase>
+            <testcase classname="Feature3" name="Feature3-Test2" time="5">
+                <failure type="Failure" message="Some general text message which may contain explanation for failure">
+                    Full filename and even line number where test failed
+                </failure>
+                <error type="Error"/>
+                <system-out>Full log from test execution goes here</system-out>
+            </testcase>
+            <testcase classname="Feature3" name="Feature3-Test3" time="5">
+                <system-out>Full log from test execution goes here and overwrites failed run</system-out>
+            </testcase>
+        </testsuite>
+    </testsuite>
 </testsuites>
-

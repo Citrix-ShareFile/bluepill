@@ -1,4 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="Selected tests" tests="148" failures="2" errors="1" time="1029.446000">
+<testsuites name="Selected tests" tests="3" failures="2" errors="2" time="30">
+    <testsuite tests="3" failure="2" error="2" time="30" name="ProductName.xctest">
+        <testsuite tests="1" failure="0" error="0" time="10" name="Feature1">
+            <testcase classname="Feature1" name="Feature1-Test1" time="10">
+                <system-out>Full log from test execution goes here</system-out>
+            </testcase>
+        </testsuite>
+        <testsuite tests="1" failure="1" error="1" time="10" name="Feature2">
+            <testcase classname="Feature2" name="Feature2-Test1" time="10">
+                <failure type="Failure" message="Some general text message which may contain explanation for failure">
+                    Full filename and even line number where test failed
+                </failure>
+                <error type="Error"/>
+                <system-out>Full log from test execution goes here</system-out>
+            </testcase>
+        </testsuite>
+        <testsuite tests="1" failure="1" error="1" time="10" name="Feature3">
+            <testcase classname="Feature3" name="Feature3-Test3" time="10">
+                <failure type="Failure" message="This message should be overwritten by passing re-run">
+                    This message should be overwritten by passing re-run
+                </failure>
+                <error type="Error"/>
+                <system-out>This message should be overwritten by passing re-run</system-out>
+            </testcase>
+        </testsuite>
+        
+    </testsuite>
 </testsuites>
-

@@ -31,12 +31,15 @@
     /**from here we need to go inside this node and get its child nodes
     *
     * testsuites from a simulator report (.xml) - needs to be combined
-    *     |--testsuite with test class name (XXXXTests) - needs to be combined
-    *     |      |--testcase
-    *     |      |--testcase
-    *     |      |--testcase
-    *     |           ...
-    *     |--testsuite
+    *   |
+    *   |--device (iPhone or iPad)
+    *       |
+    *       |--testsuite with test class name (XXXXTests) - needs to be combined
+    *       |      |--testcase
+    *       |      |--testcase
+    *       |      |--testcase
+    *       |           ...
+    *       |--testsuite
     *             ...
     */
     
@@ -58,17 +61,21 @@
                     [BPUtils printInfo:ERROR withString:@"Failed to parse %@: %@", url, error.localizedDescription];
                     return;
                 }
-                
+                NSString *deviceName = [self deviceNameFromPath:url];
+                if ([all_tests objectForKey:deviceName] == nil) {
+                    all_tests[deviceName] = [NSMutableDictionary new];
+                }
+
                 NSArray *testCaseNodes = [doc.rootElement nodesForXPath:@"//testcase" error:&error];
                 for (NSXMLElement *testCaseNode in testCaseNodes) {
                     NSString *className = [[testCaseNode attributeForName:@"classname"] stringValue];
                     NSString *testName = [[testCaseNode attributeForName:@"name"] stringValue];
-                    if ([all_tests objectForKey:className] == nil) {
-                        all_tests[className] = [NSMutableDictionary new];
+                    if ([all_tests[deviceName] objectForKey:className] == nil) {
+                        all_tests[deviceName][className] = [NSMutableDictionary new];
                     }
                     //don't re-write passed test with failed
-                    if (([all_tests[className] objectForKey:testName] == nil) || [self testPassed:testCaseNode]) {
-                        all_tests[className][testName] = testCaseNode;
+                    if (([all_tests[deviceName][className] objectForKey:testName] == nil) || [self testPassed:testCaseNode]) {
+                        all_tests[deviceName][className][testName] = testCaseNode;
                     }
                 }
 
@@ -80,17 +87,23 @@
     }
     
     NSXMLElement *rootNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuites"];
-    for (NSString *className in all_tests) {
-        NSMutableDictionary *tests = [all_tests objectForKey:className]; //all_tests[className];
-        NSXMLElement *testSuiteNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuite"];
+    for (NSString *deviceName in all_tests) {
+        NSXMLElement *deviceNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuite"];
+        deviceNode = [self setNodeAttributes:deviceNode withName:deviceName];
         
-        for (NSString *testName in tests) {
-            [testSuiteNode addChild:[tests objectForKey:testName]];
+        for (NSString *className in all_tests[deviceName]) {
+            NSMutableDictionary *tests = [all_tests[deviceName] objectForKey:className];
+            NSXMLElement *testSuiteNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuite"];
+            
+            for (NSString *testName in tests) {
+                [testSuiteNode addChild:[tests objectForKey:testName]];
+            }
+            
+            testSuiteNode = [self setNodeAttributes:testSuiteNode withName:className];
+            [deviceNode addChild:testSuiteNode];
         }
-        
-        // might improve by adding device name to suite name, or introducing one more level of testsuites
-        testSuiteNode = [self setNodeAttributes:testSuiteNode withName:className];
-        [rootNode addChild:testSuiteNode];
+        deviceNode = [self setNodeAttributes:deviceNode withName:deviceName];
+        [rootNode addChild:deviceNode];
     }
 
     rootNode = [self setNodeAttributes:rootNode withName:@"Selected tests"];
@@ -103,12 +116,13 @@
 + (NSXMLElement *)setNodeAttributes:(NSXMLElement *)node withName:(NSString *)testSuiteName {
     NSError *error;
     NSMutableDictionary *nodeAttributes = [NSMutableDictionary new];
-    nodeAttributes[@"name"] = testSuiteName;
     NSArray *tests = [node nodesForXPath:@".//testcase" error:&error];
-    nodeAttributes[@"tests"] = [@(tests.count) stringValue];
     NSArray *errors = [node nodesForXPath:@".//error" error:&error];
-    nodeAttributes[@"errors"] = [@(errors.count) stringValue];
     NSArray *failures = [node nodesForXPath:@".//failure" error:&error];
+    
+    nodeAttributes[@"name"] = testSuiteName;
+    nodeAttributes[@"tests"] = [@(tests.count) stringValue];
+    nodeAttributes[@"errors"] = [@(errors.count) stringValue];
     nodeAttributes[@"failures"] = [@(failures.count) stringValue];
     nodeAttributes[@"time"] = [@([self getTimeFromAllTestNodes:node]) stringValue];
     [node setAttributesAsDictionary:nodeAttributes];
@@ -139,6 +153,13 @@
     return hasNoFailures && hasNoErrors;
 }
 
++ (NSString *)deviceNameFromPath:(NSURL *)url {
+    NSArray<NSString *> *pathComponents = url.pathComponents;
+    NSLog (@"Number of elements in url = %lu", [pathComponents count]);
+    unsigned long index = [pathComponents count] - 2; // need last folder name but not last element
+    NSString *result = [pathComponents objectAtIndex: index];
+    return result;
+}
 
 
 @end
