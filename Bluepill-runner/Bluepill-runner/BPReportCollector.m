@@ -32,7 +32,6 @@
     *
     * testsuites from a simulator report (.xml) - needs to be combined
     *   |
-    *   |--device (iPhone or iPad)
     *       |
     *       |--testsuite with test class name (XXXXTests) - needs to be combined
     *       |      |--testcase
@@ -70,6 +69,8 @@
                 for (NSXMLElement *testCaseNode in testCaseNodes) {
                     NSString *className = [[testCaseNode attributeForName:@"classname"] stringValue];
                     NSString *testName = [[testCaseNode attributeForName:@"name"] stringValue];
+                    NSString *newTestClassName = [NSString stringWithFormat:@"%@.%@", deviceName, className];
+                    [self setTestCaseNodeClassName:testCaseNode withName:newTestClassName];
                     if ([all_tests[deviceName] objectForKey:className] == nil) {
                         all_tests[deviceName][className] = [NSMutableDictionary new];
                     }
@@ -88,9 +89,6 @@
     
     NSXMLElement *rootNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuites"];
     for (NSString *deviceName in all_tests) {
-        NSXMLElement *deviceNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuite"];
-        deviceNode = [self setNodeAttributes:deviceNode withName:deviceName];
-        
         for (NSString *className in all_tests[deviceName]) {
             NSMutableDictionary *tests = [all_tests[deviceName] objectForKey:className];
             NSXMLElement *testSuiteNode = (NSXMLElement *)[NSXMLNode elementWithName:@"testsuite"];
@@ -98,12 +96,10 @@
             for (NSString *testName in tests) {
                 [testSuiteNode addChild:[tests objectForKey:testName]];
             }
-            
-            testSuiteNode = [self setNodeAttributes:testSuiteNode withName:className];
-            [deviceNode addChild:testSuiteNode];
+            NSString *testSuiteNameWithDevice = [NSString stringWithFormat:@"%@.%@", deviceName, className];
+            testSuiteNode = [self setNodeAttributes:testSuiteNode withName:testSuiteNameWithDevice withPackageName:deviceName];
+            [rootNode addChild:testSuiteNode];
         }
-        deviceNode = [self setNodeAttributes:deviceNode withName:deviceName];
-        [rootNode addChild:deviceNode];
     }
 
     rootNode = [self setNodeAttributes:rootNode withName:@"Selected tests"];
@@ -113,7 +109,7 @@
     [xmlData writeToFile:finalReportPath atomically:YES];
 }
 
-+ (NSXMLElement *)setNodeAttributes:(NSXMLElement *)node withName:(NSString *)testSuiteName {
++ (NSXMLElement *)setNodeAttributes:(NSXMLElement *)node withName:(NSString *)testSuiteName withPackageName:(NSString *)packageName{
     NSError *error;
     NSMutableDictionary *nodeAttributes = [NSMutableDictionary new];
     NSArray *tests = [node nodesForXPath:@".//testcase" error:&error];
@@ -121,10 +117,25 @@
     NSArray *failures = [node nodesForXPath:@".//failure" error:&error];
     
     nodeAttributes[@"name"] = testSuiteName;
+    if ([packageName length] != 0) {
+        nodeAttributes[@"package"] = packageName;
+    }
     nodeAttributes[@"tests"] = [@(tests.count) stringValue];
     nodeAttributes[@"errors"] = [@(errors.count) stringValue];
     nodeAttributes[@"failures"] = [@(failures.count) stringValue];
     nodeAttributes[@"time"] = [@([self getTimeFromAllTestNodes:node]) stringValue];
+    [node setAttributesAsDictionary:nodeAttributes];
+    
+    return node;
+}
+
++ (NSXMLElement *)setNodeAttributes:(NSXMLElement *)node withName:(NSString *)testSuiteName {
+    return [self setNodeAttributes:node withName:testSuiteName withPackageName:@""];
+}
+
++ (NSXMLElement *)setTestCaseNodeClassName:(NSXMLElement *)node withName:(NSString *)newTestClassName {
+    NSMutableDictionary *nodeAttributes = [NSMutableDictionary new];
+    nodeAttributes[@"classname"] = newTestClassName;
     [node setAttributesAsDictionary:nodeAttributes];
     
     return node;

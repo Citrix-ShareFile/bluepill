@@ -59,19 +59,23 @@
     NSLog(@"%@, %@, %@", [[root attributeForName:@"tests"] stringValue], [[root attributeForName:@"errors"] stringValue], [[root attributeForName:@"failures"] stringValue]);
     
     //Feature1 results
-    NSXMLElement *feature1 = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testsuite[@name='Feature1']"] error:&error][0];
+    NSXMLElement *feature1 = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testsuite[@name='Contents.Feature1']"] error:&error][0];
     XCTAssertTrue([[[feature1 attributeForName:@"tests"] stringValue] isEqualToString:@"1"], @"test count is wrong");
     XCTAssertTrue([[[feature1 attributeForName:@"errors"] stringValue] isEqualToString:@"0"], @"errors count is wrong");
     XCTAssertTrue([[[feature1 attributeForName:@"failures"] stringValue] isEqualToString:@"0"], @"failures count is wrong");
-
+    
+    NSXMLElement *feature1Testcase = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testcase[@name='Feature1-Test1']"] error:&error][0];
+    NSString *feature1TestcaseClassName = [[feature1Testcase attributeForName:@"classname"] stringValue];
+    XCTAssertEqualObjects(feature1TestcaseClassName, @"Contents.Feature1", @"test classname is wrong");
+    
     //Feature2 results
-    NSXMLElement *feature2 = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testsuite[@name='Feature2']"] error:&error][0];
+    NSXMLElement *feature2 = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testsuite[@name='Contents.Feature2']"] error:&error][0];
     XCTAssertTrue([[[feature2 attributeForName:@"tests"] stringValue] isEqualToString:@"1"], @"test count is wrong");
     XCTAssertTrue([[[feature2 attributeForName:@"errors"] stringValue] isEqualToString:@"1"], @"errors count is wrong");
     XCTAssertTrue([[[feature2 attributeForName:@"failures"] stringValue] isEqualToString:@"1"], @"failures count is wrong");
 
     //Feature3 results
-    NSXMLElement *feature3 = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testsuite[@name='Feature3']"] error:&error][0];
+    NSXMLElement *feature3 = [doc nodesForXPath:[NSString stringWithFormat:@".//%@", @"testsuite[@name='Contents.Feature3']"] error:&error][0];
     XCTAssertTrue([[[feature3 attributeForName:@"tests"] stringValue] isEqualToString:@"3"], @"test count is wrong");
     XCTAssertTrue([[[feature3 attributeForName:@"errors"] stringValue] isEqualToString:@"1"], @"errors count is wrong");
     XCTAssertTrue([[[feature3 attributeForName:@"failures"] stringValue] isEqualToString:@"1"], @"failures count is wrong");
