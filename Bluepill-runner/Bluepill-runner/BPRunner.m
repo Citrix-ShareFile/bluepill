@@ -7,7 +7,6 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OF ANY KIND, either express or implied.  See the License for the specific language governing permissions and limitations under the License.
 
-#import "BPBundle.h"
 #import "BPRunner.h"
 #import "BPPacker.h"
 #import "BPUtils.h"
@@ -15,6 +14,7 @@
 #import "BPVersion.h"
 #include <sys/sysctl.h>
 #include <pwd.h>
+#import <AppKit/AppKit.h>
 
 
 static int volatile interrupted = 0;
@@ -48,11 +48,9 @@ maxprocs(void)
 
 @implementation BPRunner
 
-+ (instancetype)BPRunnerForApp:(BPApp *)app
-                    withConfig:(BPConfiguration *)config
-                    withBpPath:(NSString *)bpPath {
++ (instancetype)BPRunnerWithConfig:(BPConfiguration *)config
+                        withBpPath:(NSString *)bpPath {
     BPRunner *runner = [[BPRunner alloc] init];
-    runner.app = app;
     runner.config = config;
     // Find the `bp` binary.
 
@@ -83,16 +81,21 @@ maxprocs(void)
     return runner;
 }
 
-- (NSTask *)newTaskWithBundle:(BPBundle *)bundle andNumber:(NSUInteger)number andDevice:(NSString *)deviceID andCompletionBlock:(void (^)(NSTask *))block {
+- (NSTask *)newTaskWithBundle:(BPXCTestFile *)bundle
+                    andNumber:(NSUInteger)number
+                    andDevice:(NSString *)deviceID
+           andCompletionBlock:(void (^)(NSTask *))block {
     BPConfiguration *cfg = [self.config mutableCopy];
     assert(cfg);
-    cfg.testBundlePath = bundle.path;
-    cfg.testCasesToSkip = bundle.testsToSkip;
+    cfg.appBundlePath = bundle.UITargetAppPath ?: bundle.testHostPath;
+    cfg.testBundlePath = bundle.testBundlePath;
+    cfg.testRunnerAppPath = bundle.UITargetAppPath ? bundle.testHostPath : nil;
+    cfg.testCasesToSkip = bundle.skipTestIdentifiers;
+    cfg.commandLineArguments = bundle.commandLineArguments;
+    cfg.environmentVariables = bundle.environmentVariables;
     cfg.useSimUDID = deviceID;
     cfg.keepSimulator = cfg.reuseSimulator;
-    if (!bundle.isUITestBundle) {
-        cfg.testRunnerAppPath = nil;
-    }
+
     NSError *err;
     NSString *tmpFileName = [NSString stringWithFormat:@"%@/bluepill-%u-config",
                              NSTemporaryDirectory(),
@@ -140,14 +143,37 @@ maxprocs(void)
     return task;
 }
 
-- (int)run {
+- (NSRunningApplication *)openSimulatorAppWithConfiguration:(BPConfiguration *)config andError:(NSError **)error {
+    NSURL *simulatorURL = [NSURL fileURLWithPath:
+                           [NSString stringWithFormat:@"%@/Applications/Simulator.app/Contents/MacOS/Simulator",
+                            config.xcodePath]];
+    
+    NSWorkspaceLaunchOptions launchOptions = NSWorkspaceLaunchAsync |
+                                             NSWorkspaceLaunchWithoutActivation |
+                                             NSWorkspaceLaunchAndHide;
+    //launch Simulator.app without booting a simulator
+    NSDictionary *configuration = @{NSWorkspaceLaunchConfigurationArguments:@[@"-StartLastDeviceOnLaunch",@"0"]};
+    NSRunningApplication *app = [[NSWorkspace sharedWorkspace]
+                                 launchApplicationAtURL:simulatorURL
+                                 options:launchOptions
+                                 configuration:configuration
+                                 error:error];
+    if (!app) {
+        [BPUtils printInfo:ERROR withString:@"Launch Simulator.app returned error: %@", [*error localizedDescription]];
+        return nil;
+    }
+    return app;
+}
+
+
+- (int)runWithBPXCTestFiles:(NSArray<BPXCTestFile *> *)xcTestFiles {
     // Set up our SIGINT handler
     signal(SIGINT, onInterrupt);
     
     NSUInteger numSims = [self.config.numSims intValue];
     [BPUtils printInfo:INFO withString:@"This is Bluepill %s", BP_VERSION];
     NSError *error;
-    NSMutableArray *bundles = [BPPacker packTests:self.app.allTestBundles configuration:self.config andError:&error];
+    NSMutableArray *bundles = [BPPacker packTests:xcTestFiles configuration:self.config andError:&error];
     if (!bundles || bundles.count == 0) {
         [BPUtils printInfo:ERROR withString:@"Packing failed: %@", [error localizedDescription]];
         return 1;
@@ -159,9 +185,9 @@ maxprocs(void)
     }
     [BPUtils printInfo:INFO withString:[NSString stringWithFormat:@"Running with %lu simulator%s.",
                                         (unsigned long)numSims, (numSims > 1) ? "s" : ""]];
-    NSArray *copyBundels = [NSMutableArray arrayWithArray:bundles];
+    NSArray *copyBundles = [NSMutableArray arrayWithArray:bundles];
     for (int i = 1; i < [self.config.repeatTestsCount integerValue]; i++) {
-        [bundles addObjectsFromArray:copyBundels];
+        [bundles addObjectsFromArray:copyBundles];
     }
     [BPUtils printInfo:INFO withString:@"Packed tests into %lu bundles", (unsigned long)[bundles count]];
     __block NSUInteger launchedTasks = 0;
@@ -174,6 +200,14 @@ maxprocs(void)
     __block NSMutableArray *deviceList = [[NSMutableArray alloc] init];
     self.nsTaskList = [[NSMutableArray alloc] init];
     int old_interrupted = interrupted;
+    NSRunningApplication *app;
+    if (_config.headlessMode == NO) {
+        app = [self openSimulatorAppWithConfiguration:_config andError:&error];
+        if (!app) {
+            [BPUtils printInfo:ERROR withString:@"Could not launch Simulator.app due to error: %@", [error localizedDescription]];
+            return -1;
+        }
+    }
     while (1) {
         if (interrupted) {
             if (interrupted >=5) {
@@ -219,7 +253,7 @@ maxprocs(void)
                 rc = (rc || [task terminationStatus]);
             }];
             if (!task) {
-                NSLog(@"Failed to launch: %@ %@", [task launchPath], [task arguments]);
+                [BPUtils printInfo:ERROR withString:@"task is nil!"];
                 exit(1);
             }
             [task launch];
@@ -253,7 +287,9 @@ maxprocs(void)
     
     [BPUtils printInfo:INFO withString:@"All simulators have finished."];
     // Process the generated report and create 1 single junit xml file.
-
+    if (app) {
+        [app terminate];
+    }
     if (self.config.outputDirectory) {
         NSString *outputPath = [self.config.outputDirectory stringByAppendingPathComponent:@"TEST-FinalReport.xml"];
         NSFileManager *fm = [NSFileManager new];

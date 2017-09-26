@@ -32,11 +32,9 @@
 
 - (void)bootWithCompletion:(void (^)(NSError *error))completion;
 
-- (void)openSimulatorWithCompletion:(void (^)(NSError *))completion;
-
 - (BOOL)installApplicationAndReturnError:(NSError *__autoreleasing *)error;
 
-- (void)launchApplicationAndExecuteTestsWithParser:(BPTreeParser *)parser andCompletion:(void (^)(NSError *, pid_t))completion isHostApp:(BOOL)isHostApp;
+- (void)launchApplicationAndExecuteTestsWithParser:(BPTreeParser *)parser andCompletion:(void (^)(NSError *, pid_t))completion;
 
 - (void)deleteSimulatorWithCompletion:(void (^)(NSError *error, BOOL success))completion;
 

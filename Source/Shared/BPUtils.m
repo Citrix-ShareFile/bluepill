@@ -119,9 +119,7 @@ static BOOL quiet = NO;
 + (NSString *)mkdtemp:(NSString *)template withError:(NSError **)error {
     char *dir = strdup([[template stringByAppendingString:@"_XXXXXX"] UTF8String]);
     if (mkdtemp(dir) == NULL) {
-        if (error) {
-            *error = BP_ERROR(@"%s", strerror(errno));
-        }
+        BP_SET_ERROR(error, @"%s", strerror(errno));
         free(dir);
         return nil;
     }
@@ -134,9 +132,7 @@ static BOOL quiet = NO;
     char *file = strdup([[template stringByAppendingString:@".XXXXXX"] UTF8String]);
     int fd = mkstemp(file);
     if (fd < 0) {
-        if (error) {
-            *error = BP_ERROR(@"%s", strerror(errno));
-        }
+        BP_SET_ERROR(error, @"%s", strerror(errno));
         free(file);
         return nil;
     }
@@ -173,61 +169,27 @@ static BOOL quiet = NO;
     return [fileName isEqualToString:@"stdout"] || [fileName isEqualToString:@"-"];
 }
 
-+ (NSDictionary *)buildArgsAndEnvironmentWith:(NSString *)schemePath {
-    NSMutableDictionary *argsAndEnv = [NSMutableDictionary new];
-    argsAndEnv[@"args"]  = [NSMutableArray new];
-    argsAndEnv[@"env"]  = [NSMutableDictionary new];
-
-    NSData *xmlData = [[NSMutableData alloc] initWithContentsOfFile:schemePath];
-    NSError *error;
-    if (xmlData) {
-        NSXMLDocument *document = [[NSXMLDocument alloc] initWithData:xmlData options:0 error:&error];
-        NSArray *argsNodes =
-        [document nodesForXPath:[NSString stringWithFormat:@"//%@//CommandLineArgument", @"LaunchAction"] error:&error];
-        NSAssert(error == nil, @"Failed to get nodes: %@", [error localizedFailureReason]);
-        NSMutableArray *envNodes = [[NSMutableArray alloc] init];
-        [envNodes addObjectsFromArray:[document nodesForXPath:[NSString stringWithFormat:@"//%@//EnvironmentVariable", @"LaunchAction"] error:&error]];
-        [envNodes addObjectsFromArray:[document nodesForXPath:[NSString stringWithFormat:@"//%@//EnvironmentVariable", @"TestAction"] error:&error]];
-        for (NSXMLElement *node in argsNodes) {
-            NSString *argument = [[node attributeForName:@"argument"] stringValue];
-            if (![[[node attributeForName:@"isEnabled"] stringValue] boolValue]) {
-                continue;
-            }
-            NSArray *argumentsArray = [argument componentsSeparatedByString:@" "];
-            for (NSString *arg in argumentsArray) {
-                if (![arg isEqualToString:@""]) {
-                    [argsAndEnv[@"args"] addObject:arg];
-                }
-            }
-        }
-
-        [argsAndEnv[@"args"] addObjectsFromArray:@[@"-NSTreatUnknownArgumentsAsOpen", @"NO", @"-ApplePersistenceIgnoreState", @"YES"]];
-
-        for (NSXMLElement *node in envNodes) {
-            NSString *key = [[node attributeForName:@"key"] stringValue];
-            NSString *value = [[node attributeForName:@"value"] stringValue];
-            if ([[[node attributeForName:@"isEnabled"] stringValue] boolValue]) {
-                argsAndEnv[@"env"][key] = value;
-            }
-
-        }
-    }
-    NSAssert(error == nil, @"Failed to get nodes: %@", [error localizedFailureReason]);
-    return argsAndEnv;
-}
-
 + (NSString *)runShell:(NSString *)command {
     NSAssert(command, @"Command should not be nil");
-    NSTask *task = [NSTask new];
+    NSTask *task = [[NSTask alloc] init];
+    NSData *data;
     task.launchPath = @"/bin/sh";
     task.arguments = @[@"-c", command];
-    NSPipe *pipe = [NSPipe new];
+    NSPipe *pipe = [[NSPipe alloc] init];
     task.standardError = pipe;
     task.standardOutput = pipe;
     NSFileHandle *fh = pipe.fileHandleForReading;
-    [task launch];
+    if (task) {
+        [task launch];
+    } else {
+        NSAssert(task, @"task should not be nil");
+    }
+    if (fh) {
+        data = [fh readDataToEndOfFile];
+    } else {
+        NSAssert(task, @"fh should not be nil");
+    }
     [task waitUntilExit];
-    NSData *data = [fh readDataToEndOfFile];
     return [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
 }
 
@@ -274,6 +236,18 @@ static BOOL quiet = NO;
         }
     }
     return expandedTestCases;
+}
++ (NSString *)getXcodeRuntimeVersion {
+    NSString *xcodeVersion = [BPUtils runShell:@"xcodebuild -version"];
+    NSArray *versionStrArray = [xcodeVersion componentsSeparatedByString:@"\n"];
+    NSString *lineOne = [versionStrArray objectAtIndex:0];
+    NSString *lineTwo = [versionStrArray objectAtIndex:1];
+    NSRange xcodeRange = [lineOne rangeOfString:@"Xcode"];
+    NSString *xcodeVer = [lineOne substringFromIndex:xcodeRange.location + 6]; //Xcode version string
+    NSRange versionRange = [lineTwo rangeOfString:@"version"];
+    NSString *buildVer = [lineTwo substringFromIndex:versionRange.location+8]; //build version string
+    NSString *runTimeVersion = [NSString stringWithFormat:@"%@ (%@)", xcodeVer, buildVer];
+    return runTimeVersion;
 }
 
 @end

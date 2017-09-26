@@ -49,7 +49,7 @@
                                  @"XCTestConfiguration"];
     for (NSString *rc in requiredClasses) {
         if (NSClassFromString(rc)) {
-            NSLog(@"%@ is loaded..", rc);
+            [BPUtils printInfo:DEBUGINFO withString:@"%@ is loaded..", rc];
         } else {
             return NO;
         }
@@ -64,17 +64,12 @@
     NSString *testSimulatorFrameworkPath = [[hostAppExecPath stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
     NSString *dyldLibraryPath = [NSString stringWithFormat:@"%@:%@/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks", testSimulatorFrameworkPath, config.xcodePath];
     NSMutableDictionary<NSString *, NSString *> *environment = [@{
-                                                                  @"AppTargetLocation" : hostAppExecPath,
                                                                   @"DYLD_FALLBACK_FRAMEWORK_PATH" : [NSString stringWithFormat:@"%@/Library/Frameworks:%@/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks", config.xcodePath, config.xcodePath],
-                                                                  @"DTX_CONNECTION_SERVICES_PATH" : [NSString stringWithFormat:@"%@/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/Developer/Library/PrivateFrameworks/DTXConnectionServices.framework", config.xcodePath],
                                                                   @"DYLD_FRAMEWORK_PATH" : dyldLibraryPath,
-                                                                  @"DYLD_INSERT_LIBRARIES" : [NSString stringWithFormat:@"%@/Platforms/iPhoneSimulator.platform/Developer/Library/PrivateFrameworks/IDEBundleInjection.framework/IDEBundleInjection", config.xcodePath],
+                                                                  @"DYLD_INSERT_LIBRARIES" : [NSString stringWithFormat:@"%@/Platforms/iPhoneOS.platform/Developer/Library/CoreSimulator/Profiles/Runtimes/iOS.simruntime/Contents/Resources/RuntimeRoot/Developer/usr/lib/libXCTTargetBootstrapInject.dylib", config.xcodePath],
                                                                   @"DYLD_LIBRARY_PATH" : dyldLibraryPath,
                                                                   @"NSUnbufferedIO" : @YES,
                                                                   @"OS_ACTIVITY_DT_MODE" : @YES,
-                                                                  @"TestBundleLocation" : config.testBundlePath,
-                                                                  @"XCInjectBundle" : config.testBundlePath,
-                                                                  @"XCInjectBundleInto" : hostAppExecPath,
                                                                   @"MNTF_TINKER_DELAY": @0.01,
                                                                   @"XCODE_DBG_XPC_EXCLUSIONS" : @"com.apple.dt.xctestSymbolicator",
                                                                   @"XCTestConfigurationFilePath" : [SimulatorHelper testEnvironmentWithConfiguration:config],
@@ -98,12 +93,15 @@
 
     NSString *testBundlePath = config.testBundlePath;
     NSString *appName = [self appNameForPath:testBundlePath];
+    NSString *testHostPath;
     xctConfig.productModuleName = appName;
     xctConfig.testBundleURL = [NSURL fileURLWithPath:testBundlePath];
     xctConfig.sessionIdentifier = config.sessionIdentifier;
     xctConfig.treatMissingBaselinesAsFailures = NO;
     xctConfig.targetApplicationPath = config.appBundlePath;
     xctConfig.reportResultsToIDE = YES;
+    xctConfig.automationFrameworkPath = [NSString stringWithFormat:@"%@/Platforms/iPhoneSimulator.platform/Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework", config.xcodePath],
+    testHostPath = config.appBundlePath;
 
     if (config.testRunnerAppPath) {
         xctConfig.targetApplicationBundleID = [self bundleIdForPath:config.appBundlePath];
@@ -112,6 +110,7 @@
         xctConfig.reportActivities = NO;
         xctConfig.testsMustRunOnMainThread = YES;
         xctConfig.pathToXcodeReportingSocket = nil;
+        testHostPath = config.testRunnerAppPath;
     }
 
     if (config.testCasesToSkip) {
@@ -122,10 +121,10 @@
         // According to @khu, we can't just pass the right setTestsToRun and have it work, so what we do instead
         // is get the full list of tests from the XCTest bundle, then skip everything we don't want to run.
         NSError *error;
-        NSString *basename = [[testBundlePath lastPathComponent] stringByDeletingPathExtension];
-        NSString *executable = [testBundlePath stringByAppendingPathComponent:basename];
 
-        BPXCTestFile *xctTestFile = [BPXCTestFile BPXCTestFileFromExecutable:executable isUITestFile:(config.testRunnerAppPath == nil) withError:&error];
+        BPXCTestFile *xctTestFile = [BPXCTestFile BPXCTestFileFromXCTestBundle:testBundlePath
+                                                              andHostAppBundle:testHostPath
+                                                                     withError:&error];
         NSAssert(xctTestFile != nil, @"Failed to load testcases from %@", [error localizedDescription]);
         NSMutableSet *testsToSkip = [[NSMutableSet alloc] initWithArray:xctTestFile.allTestCases];
         NSSet *testsToRun = [[NSSet alloc] initWithArray:config.testCasesToRun];
@@ -150,6 +149,12 @@
 
 + (NSString *)bundleIdForPath:(NSString *)path {
     NSDictionary *dic = [NSDictionary dictionaryWithContentsOfFile:[path stringByAppendingPathComponent:@"Info.plist"]];
+    
+    NSString *platform = [dic objectForKey:@"DTPlatformName"];
+    if (platform && ![platform isEqualToString:@"iphonesimulator"]) {
+        [BPUtils printInfo:ERROR withString:@"Wrong platform in %@. Expected 'iphonesimulator', found '%@'", path, platform];
+        return nil;
+    }
 
     NSString *bundleId = [dic objectForKey:(NSString *)kCFBundleIdentifierKey];
     if (!bundleId) {
