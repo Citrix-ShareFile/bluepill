@@ -26,7 +26,7 @@
 - (void)testExample {
     [self.app launch];
     [self.app.buttons[@"Tap Me"] tap];
-    XCUIElement *textField = [[self.app.otherElements containingType:XCUIElementTypeButton identifier:@"Tap Me"] childrenMatchingType:XCUIElementTypeTextField].element;
+    XCUIElement *textField = [[self.app.otherElements containingType:XCUIElementTypeButton identifier:@"Tap Me 2"] childrenMatchingType:XCUIElementTypeTextField].element;
     [textField tap];
     [textField typeText:@"keqiu"];
 }
