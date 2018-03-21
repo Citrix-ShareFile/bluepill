@@ -22,12 +22,6 @@
 - (void)onTestSuiteBegan:(NSString *)testSuiteName onDate:(NSDate *)startDate isRoot:(BOOL)isRoot;
 
 - (void)onTestSuiteEnded:(NSString *)testSuiteName
-                fromDate:(NSDate *)startDate
-                  toDate:(NSDate *)endDate
-                  passed:(BOOL)wholeSuitePassed
-               withTotal:(NSUInteger)totalTestCount
-                  failed:(NSUInteger)failedCount
-              unexpected:(NSUInteger)unexpectedFailures
                   isRoot:(BOOL)isRoot;
 
 - (void)onTestCaseBeganWithName:(NSString *)testName inClass:(NSString *)testClass;
@@ -37,6 +31,8 @@
 - (void)onTestCaseFailedWithName:(NSString *)testName inClass:(NSString *)testClass inFile:(NSString *)filePath onLineNumber:(NSUInteger)lineNumber wasException:(BOOL)wasException;
 
 - (void)onOutputReceived:(NSString *)output;
+
+- (void)setParserStateCompleted;
 
 @end
 

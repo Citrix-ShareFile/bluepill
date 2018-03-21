@@ -14,14 +14,16 @@
 #define BP_DEFAULT_XCODE_VERSION "Xcode 9.2"
 #define BP_TM_PROTOCOL_VERSION 17
 #define BP_DAEMON_PROTOCOL_VERSION 24
+#define BP_MAX_PROCESSES_PERCENT 0.75
 
 
-static const NSString * kCFBundleIdentifier = @"CFBundleIdentifier";
-static const NSString * kOptionsArgumentsKey = @"arguments";
-static const NSString * kOptionsEnvironmentKey = @"environment";
-static const NSString * kOptionsStderrKey = @"stderr";
-static const NSString * kOptionsStdoutKey = @"stdout";
-static const NSString * kOptionsWaitForDebuggerKey = @"wait_for_debugger";
+extern NSString * const kCFBundleIdentifier;
+extern NSString * const kOptionsArgumentsKey;
+extern NSString * const kOptionsEnvironmentKey;
+extern NSString * const kOptionsStderrKey;
+extern NSString * const kOptionsStdoutKey;
+extern NSString * const kOptionsWaitForDebuggerKey;
+extern NSString * const kSimulatorLibraryPath;
 
 extern NSString * const BPErrorDomain;
 

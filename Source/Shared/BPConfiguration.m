@@ -9,6 +9,7 @@
 
 #import "BPConfiguration.h"
 #import "BPUtils.h"
+#import "BPVersion.h"
 #import <getopt.h>
 #import <objc/runtime.h>
 #import "BPConstants.h"
@@ -138,6 +139,8 @@ struct BPOptions {
         "Save Simulator diagnostics and useful debugging information in the output directory. If no output directory it doesn't do anything."},
     {361, "screenshots-directory", BP_MASTER | BP_SLAVE, NO, NO, required_argument, NULL, BP_VALUE | BP_PATH, "screenshotsDirectory",
         "Directory where simulator screenshots for failed ui tests will be stored"},
+    {362, "simulator-preferences-file", BP_MASTER | BP_SLAVE, NO, NO, required_argument, NULL, BP_VALUE | BP_PATH, "simulatorPreferencesFile",
+            "A .GlobalPreferences.plist simulator preferences file to be copied to any newly created simulators before booting"},
 
     {0, 0, 0, 0, 0, 0, 0}
 };
@@ -437,11 +440,21 @@ static NSUUID *sessionID;
         id value = [configDict objectForKey:key];
         for (int i = 0; BPOptions[i].name; i++) {
             if (!strcmp([key UTF8String], BPOptions[i].name)) {
-
                 if (BPOptions[i].kind & BP_LIST && ![value isKindOfClass:[NSArray class]]) {
                     BP_SET_ERROR(error, @"Expected type %@ for key '%@', got %@. Parsing failed.",
                                           [NSArray className], key, [value className]);
                     return NO;
+                }
+                if (BPOptions[i].kind & BP_LIST && [value isKindOfClass:[NSArray class]] && (strcmp(@"include".UTF8String, BPOptions[i].name) || strcmp(@"exclude".UTF8String, BPOptions[i].name))) {
+                    NSMutableArray *testCases = [NSMutableArray new];
+                    for (NSString *testCase in value) {
+                        NSString *trimmedTestName = [BPUtils trimTrailingParanthesesFromTestName:testCase];
+                        if (trimmedTestName == nil) {
+                            continue;
+                        }
+                        [testCases addObject:trimmedTestName];
+                    }
+                    value = [NSArray arrayWithArray:testCases];
                 }
                 if (BPOptions[i].kind & BP_PATH) {
                     NSString *currentPath = [[NSFileManager defaultManager] currentDirectoryPath];
@@ -609,6 +622,22 @@ static NSUUID *sessionID;
         BP_SET_ERROR(err, @"Could not find Xcode at %@", self.xcodePath);
         return NO;
     }
+    
+    //Check if xcode version running on the host match the intended Bluepill branch: Xcode 9 branch is not backward compatible
+    NSString *xcodeVersion = [BPUtils runShell:@"xcodebuild -version"];
+    if ([xcodeVersion rangeOfString:@BP_DEFAULT_XCODE_VERSION].location == NSNotFound) {
+        BP_SET_ERROR(err, @"ERROR: Invalid Xcode version:\n%s;\nOnly %s is supported\n", [xcodeVersion UTF8String], BP_DEFAULT_XCODE_VERSION);
+        return NO;
+    }
+    
+    //Check if Bluepill compile time Xcode version is matched with Bluepill runtime Xcode version
+    //Senario to prevent: Bluepill is compiled with Xcode 8, but runs with host installed with Xcode 9
+    //Only compare major and minor version version Exg. 9.1 == 9.1
+    if (![[[BPUtils getXcodeRuntimeVersion] substringToIndex:3] isEqualToString:[@XCODE_VERSION substringToIndex:3]]) {
+        BP_SET_ERROR(err, @"ERROR: Bluepill runtime version %s and compile time version %s are mismatched\n",
+                     [[[BPUtils getXcodeRuntimeVersion] substringToIndex:3] UTF8String], [[@XCODE_VERSION substringToIndex:3] UTF8String]);
+        return NO;
+    }
 
     if (self.deleteSimUDID) {
         return YES;
@@ -675,6 +704,18 @@ static NSUUID *sessionID;
                                                                  error:err]) {
                 return NO;
             }
+        }
+    }
+
+    if (self.simulatorPreferencesFile) {
+        if ([[NSFileManager defaultManager] fileExistsAtPath:self.simulatorPreferencesFile isDirectory:&isdir]) {
+            if (isdir) {
+                BP_SET_ERROR(err, @"%@ is a directory.", self.simulatorPreferencesFile);
+                return NO;
+            }
+        } else {
+            BP_SET_ERROR(err, @"%@ doesn't exist", self.simulatorPreferencesFile);
+            return NO;
         }
     }
 

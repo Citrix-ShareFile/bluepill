@@ -62,9 +62,11 @@ typedef NS_ENUM(NSInteger, BPProgram) {
 @property (nonatomic) BOOL onlyRetryFailed;
 @property (nonatomic, strong) NSArray *testCasesToSkip;
 @property (nonatomic, strong) NSArray *testCasesToRun;
+@property (nonatomic, strong) NSArray *allTestCases;
 @property (nonatomic, strong) NSString *configOutputFile;
 @property (nonatomic, strong) NSString *outputDirectory;
 @property (nonatomic, strong) NSString *screenshotsDirectory;
+@property (nonatomic, strong) NSString *simulatorPreferencesFile;
 @property (nonatomic) BOOL headlessMode;
 @property (nonatomic, strong) NSNumber *numSims;
 @property (nonatomic) BOOL listTestsOnly;

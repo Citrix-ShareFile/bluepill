@@ -74,7 +74,7 @@ typedef NS_ENUM(int, BPKind) {
  @param kind one of the levels in BPKind
  @param fmt a format string (a la printf), followed by the var args.
  */
-+ (void)printInfo:(BPKind)kind withString:(NSString *)fmt, ...;
++ (void)printInfo:(BPKind)kind withString:(NSString *)fmt, ... NS_FORMAT_FUNCTION(2,3);
 
 /*!
  @discussion get an NSError *
@@ -140,4 +140,10 @@ typedef BOOL (^BPRunBlock)(void);
  */
 + (void)saveDebuggingDiagnostics:(NSString *)outputDirectory;
 
+/*!
+ * @discussion removing trailing parantheses from test names from the extracted symbols
+ * @param testName the name of the test to trim
+ * @return trimmed test name
+ */
++ (NSString *)trimTrailingParanthesesFromTestName:(NSString *)testName;
 @end

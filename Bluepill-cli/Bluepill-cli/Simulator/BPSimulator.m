@@ -25,7 +25,6 @@
 @property (nonatomic, strong) NSRunningApplication *app;
 @property (nonatomic, strong) NSFileHandle *stdOutHandle;
 @property (nonatomic, assign) BOOL needsRetry;
-@property (nonatomic, assign) BOOL appProcessFinished;
 
 @end
 
@@ -44,12 +43,12 @@
     NSError *error;
     SimServiceContext *sc = [SimServiceContext sharedServiceContextForDeveloperDir:self.config.xcodePath error:&error];
     if (!sc) {
-        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimServiceContext failed: %@", [error localizedDescription]]];
+        [BPUtils printInfo:ERROR withString:@"SimServiceContext failed: %@", [error localizedDescription]];
         return;
     }
     SimDeviceSet *deviceSet = [sc defaultDeviceSetWithError:&error];
     if (!deviceSet) {
-        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimDeviceSet failed: %@", [error localizedDescription]]];
+        [BPUtils printInfo:ERROR withString:@"SimDeviceSet failed: %@", [error localizedDescription]];
         return;
     }
 
@@ -69,6 +68,10 @@
                                    completion(error);
                                });
                            } else {
+                               if (__self.config.simulatorPreferencesFile) {
+                                   [__self copySimulatorPreferencesFile:__self.config.simulatorPreferencesFile];
+                               }
+
                                dispatch_async(dispatch_get_main_queue(), ^{
                                    [__self bootWithCompletion:^(NSError *error) {
                                        dispatch_async(dispatch_get_main_queue(), ^{
@@ -80,23 +83,49 @@
                        }];
 }
 
+- (NSURL *)preferencesFile {
+    return [NSURL fileURLWithPath:kSimulatorLibraryPath relativeToURL:[NSURL fileURLWithPath:self.device.dataPath]];
+}
+
+- (void)copySimulatorPreferencesFile:(NSString *)newPreferencesFile {
+
+    NSURL *source = [NSURL fileURLWithPath:newPreferencesFile];
+    NSURL *destination = self.preferencesFile;
+
+
+    [NSFileManager.defaultManager
+            createDirectoryAtURL:destination.URLByDeletingLastPathComponent
+     withIntermediateDirectories:YES
+                      attributes:nil
+                           error:nil];
+
+    [NSFileManager.defaultManager removeItemAtURL:destination error:nil];
+
+    NSError *copyError = nil;
+    [NSFileManager.defaultManager copyItemAtURL:source toURL:destination error:&copyError];
+
+    if (copyError) {
+        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"Failed copying GlobalPreferences plist: %@", [copyError localizedDescription]]];
+    }
+}
+
 - (BOOL)useSimulatorWithDeviceUDID:(NSUUID *)deviceUDID {
     self.device = [self findDeviceWithConfig:self.config andDeviceID:deviceUDID];
     if (!self.device) {
-        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimDevice not found: %@", [deviceUDID UUIDString]]];
+        [BPUtils printInfo:ERROR withString:@"SimDevice not found: %@", [deviceUDID UUIDString]];
         return NO;
     }
 
     if (![self.device.stateString isEqualToString:@"Booted"]) {
-        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimDevice exists, but not booted: %@", [deviceUDID UUIDString]]];
+        [BPUtils printInfo:ERROR withString:@"SimDevice exists, but not booted: %@", [deviceUDID UUIDString]];
         return NO;
     }
 
     if (!self.config.headlessMode) {
         self.app = [self findSimGUIApp];
         if (!self.app) {
-            [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimDevice running, but no running Simulator App in non-headless mode: %@",
-                                                 [deviceUDID UUIDString]]];
+            [BPUtils printInfo:ERROR withString:@"SimDevice running, but no running Simulator App in non-headless mode: %@",
+                                                 [deviceUDID UUIDString]];
             return NO;
         }
     }
@@ -136,7 +165,7 @@
         [BPUtils printInfo:ERROR withString:@"Simulator %@ failed to boot. State: %@", self.device.UDID.UUIDString, self.device.stateString];
         return [NSError errorWithDomain:@"Simulator failed to boot" code:-1 userInfo:nil];
     }
-    [BPUtils printInfo:INFO withString:@"Simulator %@ achieved the BOOTED state", self.device.UDID.UUIDString, self.device.stateString];
+    [BPUtils printInfo:INFO withString:@"Simulator %@ achieved the BOOTED state %@", self.device.UDID.UUIDString, self.device.stateString];
     return nil;
 }
 
@@ -144,12 +173,12 @@
     NSError *error;
     SimServiceContext *sc = [SimServiceContext sharedServiceContextForDeveloperDir:config.xcodePath error:&error];
     if (!sc) {
-        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimServiceContext failed: %@", [error localizedDescription]]];
+        [BPUtils printInfo:ERROR withString:@"SimServiceContext failed: %@", [error localizedDescription]];
         return nil;
     }
     SimDeviceSet *deviceSet = [sc defaultDeviceSetWithError:&error];
     if (!deviceSet) {
-        [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"SimDeviceSet failed: %@", [error localizedDescription]]];
+        [BPUtils printInfo:ERROR withString:@"SimDeviceSet failed: %@", [error localizedDescription]];
         return nil;
     }
 
@@ -176,7 +205,7 @@
         NSError *error;
         BOOL uploadResult = [self.device addVideo:videoUrl error:&error];
         if (!uploadResult) {
-            [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"Failed to upload video at path: %@, error message: %@", urlString, [error description]]];
+            [BPUtils printInfo:ERROR withString:@"Failed to upload video at path: %@, error message: %@", urlString, [error description]];
         }
     }
 }
@@ -187,7 +216,7 @@
         NSError *error;
         BOOL uploadResult = [self.device addPhoto:photoUrl error:&error];
         if (!uploadResult) {
-            [BPUtils printInfo:ERROR withString:[NSString stringWithFormat:@"Failed to upload photo at path: %@, error message: %@", urlString, [error description]]];
+            [BPUtils printInfo:ERROR withString:@"Failed to upload photo at path: %@, error message: %@", urlString, [error description]];
         }
     }
 }
@@ -315,7 +344,7 @@
     [self.device launchApplicationAsyncWithID:hostBundleId options:options completionHandler:^(NSError *error, pid_t pid) {
         // Save the process ID to the monitor
         blockSelf.monitor.appPID = pid;
-        blockSelf.monitor.simulatorState = AppLaunched;
+        blockSelf.monitor.appState = Running;
 
         [blockSelf.stdOutHandle writeData:[@"DEBUG_FLAG_TOBEREMOVED.\n" dataUsingEncoding:NSUTF8StringEncoding]];
 
@@ -328,8 +357,9 @@
                 dispatch_source_cancel(source);
             });
             dispatch_source_set_cancel_handler(source, ^{
+                blockSelf.monitor.appState = Completed;
+                [parser.delegate setParserStateCompleted];
                 // Post a APPCLOSED signal to the fifo
-                blockSelf.appProcessFinished = YES;
                 [blockSelf.stdOutHandle writeData:[@"\nBP_APP_PROC_ENDED\n" dataUsingEncoding:NSUTF8StringEncoding]];
             });
             dispatch_resume(source);
@@ -405,8 +435,8 @@
     return [self checkFinished];
 }
 
-- (BOOL)isApplicationStarted {
-    return self.appProcessFinished || [self.monitor isApplicationStarted];
+- (BOOL)isApplicationLaunched {
+    return [self.monitor isApplicationLaunched];
 }
 
 - (BOOL)didTestStart {
@@ -439,6 +469,9 @@
 - (NSDictionary *)appInfo:(NSString *)bundleID error:(NSError **)error {
     NSDictionary *appInfo = [self.device propertiesOfApplication:bundleID error:error];
     return appInfo;
+}
+
+- (void)setParserStateCompleted {
 }
 
 @end
