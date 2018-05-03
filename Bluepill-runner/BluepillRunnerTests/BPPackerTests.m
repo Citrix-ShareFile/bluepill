@@ -218,6 +218,12 @@
     // 201 / 4 = 50.25 => rounded up to 51
     self.config.numSims = @4;
     bundles = [BPPacker packTests:app.testBundles configuration:self.config andError:nil];
+    for (BPXCTestFile *bundle in bundles) {
+        XCTAssert(bundle.numTests > 0);
+        XCTAssert(bundle.skipTestIdentifiers.count > 0);
+        XCTAssertNotNil(bundle.name);
+    }
+
     XCTAssertEqual([bundles[0].skipTestIdentifiers count], testsCount - 51);
     XCTAssertEqual([bundles[1].skipTestIdentifiers count], testsCount - 51);
     XCTAssertEqual([bundles[2].skipTestIdentifiers count], testsCount - 51);

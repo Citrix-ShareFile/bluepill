@@ -260,10 +260,15 @@ maxprocs(void)
             @synchronized(self) {
                 [taskList addObject:[NSString stringWithFormat:@"%lu", taskNumber]];
                 [self.nsTaskList addObject:task];
-                [bundles removeObjectAtIndex:0];
                 [BPUtils printInfo:INFO withString:@"Started Simulator %lu (PID %d).", taskNumber, [task processIdentifier]];
-                launchedTasks++;
                 [BPUtils printInfo:INFO withString:@"Gently waiting to let simulator start (20sec)"];
+                launchedTasks++;
+                BPXCTestFile *bundle = [bundles objectAtIndex:0];
+                [bundles removeObjectAtIndex:0];
+                unsigned long skippedTests = [bundle.skipTestIdentifiers count];
+                unsigned long numTests = bundle.numTests - skippedTests;
+                [BPUtils printInfo:INFO withString:@"%lu tests in '%@' bundle", numTests, bundle.name];
+                
                 sleep(20);
                 seconds += 20;
             }
