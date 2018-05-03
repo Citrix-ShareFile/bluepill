@@ -142,10 +142,10 @@
     XCTAssertEqual([bundles[1].skipTestIdentifiers count], 0);
     XCTAssertEqual([bundles[2].skipTestIdentifiers count], 0);
     XCTAssertEqual([bundles[3].skipTestIdentifiers count], 0);
-    XCTAssertEqual([bundles[4].skipTestIdentifiers count], 149);
-    XCTAssertEqual([bundles[5].skipTestIdentifiers count], 149);
-    XCTAssertEqual([bundles[6].skipTestIdentifiers count], 149);
-    XCTAssertEqual([bundles[7].skipTestIdentifiers count], 159);
+    XCTAssertEqual([bundles[4].skipTestIdentifiers count], 148);
+    XCTAssertEqual([bundles[5].skipTestIdentifiers count], 148);
+    XCTAssertEqual([bundles[6].skipTestIdentifiers count], 148);
+    XCTAssertEqual([bundles[7].skipTestIdentifiers count], 162);
 
     self.config.numSims = @1;
     bundles = [BPPacker packTests:app.testBundles configuration:self.config andError:nil];
@@ -159,22 +159,22 @@
     XCTAssertEqual([bundles[1].skipTestIdentifiers count], 0);
     XCTAssertEqual([bundles[2].skipTestIdentifiers count], 0);
     XCTAssertEqual([bundles[3].skipTestIdentifiers count], 0);
-    XCTAssertEqual([bundles[4].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[5].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[6].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[7].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[8].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[9].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[10].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[11].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[12].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[13].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[14].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[15].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[16].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[17].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[18].skipTestIdentifiers count], 189);
-    XCTAssertEqual([bundles[19].skipTestIdentifiers count], 195);
+    XCTAssertEqual([bundles[4].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[5].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[6].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[7].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[8].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[9].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[10].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[11].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[12].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[13].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[14].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[15].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[16].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[17].skipTestIdentifiers count], 188);
+    XCTAssertEqual([bundles[18].skipTestIdentifiers count], 196);
+//    XCTAssertEqual([bundles[19].skipTestIdentifiers count], 195);
 
     NSMutableArray *toRun = [[NSMutableArray alloc] init];
     for (long i = 1; i <= 20; i++) {
@@ -201,7 +201,36 @@
     for (BPXCTestFile *bundle in bundles) {
         XCTAssertTrue([bundle.skipTestIdentifiers containsObject:@"BPSampleAppTests/testCase000"], @"testCase000 should be in testToSkip for all bundles");
     }
-
 }
 
+- (void)testBalancedPackingToNumberOfSims {
+    self.config.testBundlePath = [BPTestHelper sampleAppBalancingTestsBundlePath];
+    self.config.testCasesToSkip = @[];
+    BPApp *app = [BPApp appWithConfig:self.config withError:nil];
+    XCTAssert(app != nil);
+    NSArray<BPXCTestFile *> *bundles;
+    NSMutableArray *tests = [[NSMutableArray alloc] init];
+    tests = [[NSMutableArray alloc] init];
+    for (BPXCTestFile *testFile in app.testBundles) {
+        [tests addObjectsFromArray:[testFile allTestCases]];
+    }
+    long testsCount = [tests count];
+    // 201 / 4 = 50.25 => rounded up to 51
+    self.config.numSims = @4;
+    bundles = [BPPacker packTests:app.testBundles configuration:self.config andError:nil];
+    XCTAssertEqual([bundles[0].skipTestIdentifiers count], testsCount - 51);
+    XCTAssertEqual([bundles[1].skipTestIdentifiers count], testsCount - 51);
+    XCTAssertEqual([bundles[2].skipTestIdentifiers count], testsCount - 51);
+    XCTAssertEqual([bundles[3].skipTestIdentifiers count], 3*51);
+
+    // 201 / 5 = 40.2
+    self.config.numSims = @5;
+    bundles = [BPPacker packTests:app.testBundles configuration:self.config andError:nil];
+    XCTAssertEqual([bundles[0].skipTestIdentifiers count], testsCount - 41);
+    XCTAssertEqual([bundles[1].skipTestIdentifiers count], testsCount - 41);
+    XCTAssertEqual([bundles[2].skipTestIdentifiers count], testsCount - 41);
+    XCTAssertEqual([bundles[3].skipTestIdentifiers count], testsCount - 41);
+    XCTAssertEqual([bundles[4].skipTestIdentifiers count], 4*41);
+
+}
 @end

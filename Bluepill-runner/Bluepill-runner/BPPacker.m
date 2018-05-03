@@ -49,7 +49,7 @@
         }
     }
     
-    NSUInteger testsPerGroup = MAX(1, totalTests / numBundles);
+    NSUInteger testsPerGroup = MAX(1, ceil((float)totalTests / numBundles));
     NSMutableArray<BPXCTestFile *> *bundles = [[NSMutableArray alloc] init];
     for (BPXCTestFile *xctFile in sortedXCTestFiles) {
         NSArray *bundleTestsToRun = [[testsToRunByTestFilePath[xctFile.testBundlePath] allObjects] sortedArrayUsingSelector:@selector(compare:)];
