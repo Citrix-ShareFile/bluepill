@@ -156,9 +156,9 @@
 }
 
 - (NSError *)waitForDeviceReady {
-    int attempts = 1200;
+    int attempts = 600;
     while (attempts > 0 && ![self.device.stateString isEqualToString:@"Booted"]) {
-        [NSThread sleepForTimeInterval:0.1];
+        [NSThread sleepForTimeInterval:0.5];
         --attempts;
     }
     if (![self.device.stateString isEqualToString:@"Booted"]) {

@@ -263,6 +263,9 @@ maxprocs(void)
                 [bundles removeObjectAtIndex:0];
                 [BPUtils printInfo:INFO withString:@"Started Simulator %lu (PID %d).", taskNumber, [task processIdentifier]];
                 launchedTasks++;
+                [BPUtils printInfo:INFO withString:@"Gently waiting to let simulator start (20sec)"];
+                sleep(20);
+                seconds += 20;
             }
         }
         sleep(1);
