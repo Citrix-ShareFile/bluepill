@@ -173,6 +173,11 @@ maxprocs(void)
     NSUInteger numSims = [self.config.numSims intValue];
     [BPUtils printInfo:INFO withString:@"This is Bluepill %s", BP_VERSION];
     NSError *error;
+    for (BPXCTestFile *xctFile in xcTestFiles) {
+        [BPUtils printInfo:INFO withString:@"Testing %@", xctFile.description];
+        [BPUtils printInfo:INFO withString:@"Tests to run: %@", xctFile.selectedTestsToRun];
+        [BPUtils printInfo:INFO withString:@"All tests in bundle: %@", xctFile.allTestCases];
+    }
     NSMutableArray *bundles = [BPPacker packTests:xcTestFiles configuration:self.config andError:&error];
     if (!bundles || bundles.count == 0) {
         [BPUtils printInfo:ERROR withString:@"Packing failed: %@", [error localizedDescription]];
@@ -260,17 +265,17 @@ maxprocs(void)
             @synchronized(self) {
                 [taskList addObject:[NSString stringWithFormat:@"%lu", taskNumber]];
                 [self.nsTaskList addObject:task];
-                [BPUtils printInfo:INFO withString:@"Started Simulator %lu (PID %d).", taskNumber, [task processIdentifier]];
-                [BPUtils printInfo:INFO withString:@"Gently waiting to let simulator start (20sec)"];
-                launchedTasks++;
                 BPXCTestFile *bundle = [bundles objectAtIndex:0];
+                [BPUtils printInfo:INFO withString:@"Starting Simulator %lu (PID %d).", taskNumber, [task processIdentifier]];
+                [BPUtils printInfo:INFO withString:@"Test bundle: %@ (PID %d)", bundle.description, [task processIdentifier]];
+                [BPUtils printInfo:INFO withString:@"Tests to run: %@ (PID %d)", bundle.selectedTestsToRun, [task processIdentifier]];
+                [BPUtils printInfo:INFO withString:@"Tests to skip: %@ (PID %d)", bundle.skipTestIdentifiers, [task processIdentifier]];
+
+                launchedTasks++;
                 [bundles removeObjectAtIndex:0];
-                unsigned long skippedTests = [bundle.skipTestIdentifiers count];
-                unsigned long numTests = bundle.numTests - skippedTests;
-                [BPUtils printInfo:INFO withString:@"%lu tests in '%@' bundle", numTests, bundle.name];
-                
-                sleep(20);
-                seconds += 20;
+                [BPUtils printInfo:INFO withString:@"Gently waiting to let simulator start (30sec)"];
+                sleep(30);
+                seconds += 30;
             }
         }
         sleep(1);

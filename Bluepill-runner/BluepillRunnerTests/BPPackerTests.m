@@ -174,7 +174,6 @@
     XCTAssertEqual([bundles[16].skipTestIdentifiers count], 188);
     XCTAssertEqual([bundles[17].skipTestIdentifiers count], 188);
     XCTAssertEqual([bundles[18].skipTestIdentifiers count], 196);
-//    XCTAssertEqual([bundles[19].skipTestIdentifiers count], 195);
 
     NSMutableArray *toRun = [[NSMutableArray alloc] init];
     for (long i = 1; i <= 20; i++) {
@@ -222,6 +221,8 @@
         XCTAssert(bundle.numTests > 0);
         XCTAssert(bundle.skipTestIdentifiers.count > 0);
         XCTAssertNotNil(bundle.name);
+        XCTAssertNotNil(bundle.description);
+        XCTAssertNotNil(bundle.debugDescription);
     }
 
     XCTAssertEqual([bundles[0].skipTestIdentifiers count], testsCount - 51);
@@ -238,5 +239,35 @@
     XCTAssertEqual([bundles[3].skipTestIdentifiers count], testsCount - 41);
     XCTAssertEqual([bundles[4].skipTestIdentifiers count], 4*41);
 
+}
+
+- (void)testBalancedPackingToNumberOfSims_SF {
+    BPConfiguration* cfg = [BPConfiguration new];
+    cfg.xcTestRunPath = @"/Users/pavlobasiuk/stash/sharefile/XCtest_for_BP/Build/Products/ShareFileUniversalUITestForPR_iphonesimulator11.3-x86_64.xctestrun";
+    cfg.xcodePath = [BPUtils runShell:@"/usr/bin/xcode-select -print-path"];
+    NSError *err;
+    [cfg validateConfigWithError:&err];
+    BPApp *app = [BPApp appWithConfig:cfg withError:&err];
+    
+    XCTAssert(app != nil);
+    NSArray<BPXCTestFile *> *bundles;
+    NSMutableArray *tests = [[NSMutableArray alloc] init];
+    tests = [[NSMutableArray alloc] init];
+    for (BPXCTestFile *testFile in app.testBundles) {
+        [tests addObjectsFromArray:[testFile allTestCases]];
+    }
+    long testsCount = [tests count];
+    // 201 / 4 = 50.25 => rounded up to 51
+    cfg.numSims = @4;
+    bundles = [BPPacker packTests:app.testBundles configuration:cfg andError:nil];
+
+    for (BPXCTestFile *bundle in bundles) {
+        XCTAssert(bundle.numTests > 0);
+        XCTAssert(bundle.skipTestIdentifiers.count > 0);
+        XCTAssertNotNil(bundle.name);
+        XCTAssertNotNil(bundle.description);
+        XCTAssertNotNil(bundle.debugDescription);
+        XCTAssertNotNil(bundle.selectedTestsToRun);
+    }
 }
 @end

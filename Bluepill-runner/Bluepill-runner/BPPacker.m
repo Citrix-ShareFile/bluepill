@@ -35,7 +35,8 @@
     NSUInteger totalTests = 0;
     for (BPXCTestFile *xctFile in sortedXCTestFiles) {
         if (![noSplit containsObject:[xctFile name]]) {
-            NSMutableSet *bundleTestsToRun = [[NSMutableSet alloc] initWithArray:[xctFile allTestCases]];
+//            NSMutableSet *bundleTestsToRun = [[NSMutableSet alloc] initWithArray:[xctFile allTestCases]];
+            NSMutableSet *bundleTestsToRun = [[NSMutableSet alloc] initWithArray:[xctFile selectedTestsToRun]];
             if (testCasesToRun) {
                 [bundleTestsToRun intersectSet:[[NSSet alloc] initWithArray:testCasesToRun]];
             }
@@ -69,16 +70,19 @@
 
         // We don't want to pack tests from different xctest bundles so we just split
         // the current test bundle in chunks and pack those.
-        NSArray *allTestCases = [[xctFile allTestCases] sortedArrayUsingSelector:@selector(compare:)];
+//        NSArray *allTestCases = [[xctFile allTestCases] sortedArrayUsingSelector:@selector(compare:)];
+        NSArray *allTestCasesToRun = [[xctFile selectedTestsToRun] sortedArrayUsingSelector:@selector(compare:)];
         NSUInteger packed = 0;
         while (packed < bundleTestsToRun.count) {
             NSRange range;
             range.location = packed;
             range.length = min(testsPerGroup, bundleTestsToRun.count - packed);
-            NSMutableArray *testsToSkip = [NSMutableArray arrayWithArray:allTestCases];
+            NSMutableArray *testsToSkip = [NSMutableArray arrayWithArray:allTestCasesToRun];
             [testsToSkip removeObjectsInArray:[bundleTestsToRun subarrayWithRange:range]];
             [testsToSkip addObjectsFromArray:xctFile.skipTestIdentifiers];
+            [testsToSkip valueForKeyPath:@"@distinctUnionOfObjects.self"];
             [testsToSkip sortUsingSelector:@selector(compare:)];
+            
             BPXCTestFile *bundle = [xctFile copy];
             bundle.skipTestIdentifiers = testsToSkip;
             [bundles addObject:bundle];

@@ -207,6 +207,26 @@ NSString *objcNmCmdline = @"nm -U '%@' | grep ' t ' | cut -d' ' -f3,4 | cut -d'-
     return ret;
 }
 
+- (NSMutableArray *)selectedTestsToRun {
+    NSMutableArray *ret = [[NSMutableArray alloc] init];
+    Boolean keepTest = true;
+    
+    for (NSString* test in self.allTestCases) {
+        for (NSString* skipIdentifier in self.skipTestIdentifiers) {
+            if ([test hasPrefix:skipIdentifier]) {
+                keepTest = false;
+                break;
+            }
+        }
+        if (keepTest)
+            [ret addObject:test];
+        
+        keepTest = true;
+    }
+    
+    return ret;
+}
+
 - (NSString *)description {
     int tests = 0;
     for (BPTestClass *c in self.testClasses) {

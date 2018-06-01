@@ -39,6 +39,7 @@
 
 - (NSUInteger)numTests;
 - (NSArray *)allTestCases;
+- (NSArray *)selectedTestsToRun;
 - (void)listTestClasses;
 - (NSString *)description;
 - (NSString *)debugDescription;
